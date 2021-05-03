@@ -1,7 +1,8 @@
 import './styles.scss';
 import * as THREE from 'three';
-// import { OBJLoader } from './js/OBJLoader';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
+import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 
 (() => {
     /* Tamaño de la escena */
@@ -15,13 +16,15 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
     const nParkings = 5;
     /* Tamaño del parking */
     const parkingSize = 1;
+    /* Objecto vehiculo */
+    let car = null;
 
     /* Creación de la escena y asignación del color de fondo */
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0xEAECEE);
 
     /* Creación de la camara y posicionamiento de la misma --> position.set(PosicionX PosicionY PosicionZ) */
-    const camera = new THREE.PerspectiveCamera(45, sceneSize.width / sceneSize.height, 0.1, 100);
+    const camera = new THREE.PerspectiveCamera(45, sceneSize.width / sceneSize.height, 0.1, 1000);
     camera.position.set(0, 7, 25);
 
     /* Creación del render dentro del body */
@@ -64,7 +67,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
         const cube = new THREE.Mesh(boxGeometry, materialParking);
         cube.position.x = random(-(planeSize - parkingSize) / 2, (planeSize - parkingSize) / 2);
         cube.position.z = random(-(planeSize - parkingSize) / 2, (planeSize - parkingSize) / 2);
-        cube.position.y = 0.5; // Se eleva un poco cada cubo para evitar que atraviese el plano
+        cube.position.y = 0.51; // Se eleva un poco cada cubo para evitar que atraviese el plano
         scene.add(cube);
     }
     
@@ -74,10 +77,20 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
     scene.add(plane);
 
     /* Creación del vehículo a traves del archivo OBJ */
-    // const objLoader = new OBJLoader();
-    // objLoader.load('./assets/car.obj', (root) => {
-    //     scene.add(root);
-    // });
+    const mtlLoader = new MTLLoader();
+    mtlLoader.load('./assets/1377 Car.mtl', (materials) => {
+        materials.preload();
+        
+        const objLoader = new OBJLoader();
+        objLoader.setMaterials(materials);
+        objLoader.load('./assets/1377 Car.obj', (object) => {
+            car = object;
+            car.scale.set(0.01, 0.01, 0.01);
+            car.position.set(-1, 0, 10.5);
+            car.rotation.y = Math.PI;
+            scene.add(car);
+        });
+    });
 
     /* Redimensión de los elementos en función del tamaño de ventana */
     window.addEventListener('resize', () => {
@@ -91,11 +104,35 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
         renderer.setSize(sceneSize.width, sceneSize.height);
     });
 
+    window.addEventListener('keydown', (event) => {
+        if(event.code === 'ArrowUp') {
+            car.position.z -= 0.1;
+        }
+    });
+
+    window.addEventListener('keydown', (event) => {
+        if(event.code === 'ArrowDown') {
+            car.position.z += 0.1;
+        }
+    });
+
+    window.addEventListener('keydown', (event) => {
+        if(event.code === 'ArrowRight') {
+            car.position.x += 0.1;
+        }
+    })
+
+    window.addEventListener('keydown', (event) => {
+        if(event.code === 'ArrowLeft') {
+            car.position.x -= 0.1;
+        }
+    })
+
     /* Renderización de la escena y la cámara en cada frame */
     const animate = () => {
         requestAnimationFrame(animate);
         renderer.render(scene, camera);
-    }
+    };
 
     animate();
 })()
