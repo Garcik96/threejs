@@ -22,7 +22,7 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
     const parkingSize = 1;
 
     /* Objecto vehiculo */
-    let car = null;
+    let car;
 
     /* Posicion camara arriba */
     const mainCameraPosition = {
@@ -39,6 +39,19 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
 
     /* Posicion de la camara */
     let cameraPosition = CameraType.MainCamera;
+
+    /* */
+    let keyPressedController = [];
+
+    /* */
+    let direction = 0;
+    
+    /* */
+    let angle = 180;
+    let angleCamera = 0;
+    
+    /* */
+    const speed = 0.05;
 
     /* Creación de la camara y posicionamiento de la misma --> position.set(PosicionX PosicionY PosicionZ) */
     const camera = new THREE.PerspectiveCamera(45, sceneSize.width / sceneSize.height, 0.1, 1000);
@@ -145,16 +158,20 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
     /* */
     document.addEventListener('keydown', (event) => {
         if(event.code === 'ArrowUp') {
-            car.position.z -= 0.1;
+            direction = 1;
+            keyPressedController[event.code] = true;
         }
         if(event.code === 'ArrowDown') {
-            car.position.z += 0.1;
+            direction = -1;
+            keyPressedController[event.code] = true;
         }
-        if(event.code === 'ArrowRight') {
-            car.position.x += 0.1;
+        if((keyPressedController['ArrowUp'] === true || keyPressedController['ArrowDown'] === true) && event.code === 'ArrowRight') {
+            angle -= 1;
+            angleCamera -= 1;
         }
-        if(event.code === 'ArrowLeft') {
-            car.position.x -= 0.1;
+        if((keyPressedController['ArrowUp'] === true || keyPressedController['ArrowDown'] === true) && event.code === 'ArrowLeft') {
+            angle += 1;
+            angleCamera += 1;
         }
         if(event.code === 'Space' ) {
             if(camera.position.z !== car.position.z) {
@@ -162,21 +179,42 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
             } else {
                 cameraPosition = CameraType.MainCamera;
                 camera.position.set(mainCameraPosition.x, mainCameraPosition.y, mainCameraPosition.z);
+                camera.rotation.y = 0;
             }
         }
     });
 
+    /* */
+    document.addEventListener('keyup', (event) => {
+        if(event.code === 'ArrowUp' || event.code === 'ArrowDown') {
+            keyPressedController[event.code] = false;
+        }
+    })
+
+    /* */
+    const carController = () => {
+        if(keyPressedController['ArrowUp'] === true || keyPressedController['ArrowDown'] === true) {
+            car.position.z += (speed * direction) * Math.cos(Math.PI / 180 * angle);
+            car.position.x += (speed * direction) * Math.sin(Math.PI / 180 * angle);
+            car.rotation.y = Math.PI / 180 * angle;
+        }
+    }
+    
+    /* */
+    const render = () => {
+        carController();
+        if(cameraPosition === CameraType.SecondaryCamera) {
+            camera.position.set(car.position.x, car.position.y + 0.4, car.position.z);
+            camera.rotation.y = Math.PI / 180 * angleCamera;
+        }
+        parkings.forEach(parking => parking.rotation.y += 0.01);
+        renderer.render(scene, camera);
+    }
+
     /* Renderización de la escena y la cámara en cada frame */
     const animate = () => {
         requestAnimationFrame(animate);
-
-        if(cameraPosition === CameraType.SecondaryCamera) {
-            camera.position.set(car.position.x, car.position.y + 0.4, car.position.z);
-        }
-
-        parkings.forEach(parking => parking.rotation.y += 0.01);
-
-        renderer.render(scene, camera);
+        render();
     };
 
     animate();
