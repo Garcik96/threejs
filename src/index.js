@@ -48,6 +48,7 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
     
     /* */
     let angle = 180;
+	let reverseAngle = 180;
     let angleCamera = 0;
     
     /* */
@@ -189,18 +190,28 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
             direction = 1;
             keyPressedController[event.code] = true;
         }
+
         if(event.code === 'ArrowDown') {
             direction = -1;
             keyPressedController[event.code] = true;
         }
-        if((keyPressedController['ArrowUp'] === true || keyPressedController['ArrowDown'] === true) && event.code === 'ArrowRight') {
+
+        if(keyPressedController['ArrowUp'] === true && event.code === 'ArrowRight') {
             angle -= 1;
             angleCamera -= 1;
-        }
-        if((keyPressedController['ArrowUp'] === true || keyPressedController['ArrowDown'] === true) && event.code === 'ArrowLeft') {
+        } else if(keyPressedController['ArrowDown'] === true && event.code === 'ArrowRight') {
+			angle += 1;
+            angleCamera -= 1;
+		}
+
+        if(keyPressedController['ArrowUp'] === true && event.code === 'ArrowLeft') {
             angle += 1;
             angleCamera += 1;
-        }
+        } else if(keyPressedController['ArrowDown'] === true && event.code === 'ArrowLeft') {
+			angle -= 1;
+            angleCamera += 1;
+		}
+
         if(event.code === 'Space' ) {
             if(camera.position.z !== car.position.z) {
                 cameraPosition = CameraType.SecondaryCamera;
