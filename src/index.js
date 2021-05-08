@@ -101,12 +101,40 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
     /* Random para generar la posicion de los parkings */
     const random = (min, max) => Math.floor(Math.random() * (max - min)) + min;
 
+	/* */
+	const fontLoader = new THREE.FontLoader();
+
     /* Creación de los cubos de parking en función de las geometrias y meteriales */
     for(let i = 0; i < nParkings; i++) {
-        const parking = new THREE.Mesh(boxGeometry, materialParking);
 
-        let xPosition = random(-(planeSize - parkingSize) / 2, (planeSize - parkingSize) / 2);
+		let xPosition = random(-(planeSize - parkingSize) / 2, (planeSize - parkingSize) / 2);
         let zPosition = random(-(planeSize - parkingSize) / 2, (planeSize - parkingSize) / 2);
+
+		fontLoader.load('assets/helvetiker_regular.typeface.json', (font) => {
+			const color = 0x5850EC;
+
+			const materialText = new THREE.MeshBasicMaterial({
+				color: color,
+				side: THREE.DoubleSide
+			});
+
+			const messageText = "Hola mundo";
+
+			const shapes = font.generateShapes(messageText, 0.5);
+
+			const geometryText = new THREE.ShapeGeometry(shapes);
+
+			geometryText.computeBoundingBox();
+
+			const text = new THREE.Mesh(geometryText, materialText);
+			text.position.x = xPosition - 1.5;
+			text.position.z = zPosition;
+			text.position.y = 1.25;
+
+			scene.add(text);
+		} ); 
+
+        const parking = new THREE.Mesh(boxGeometry, materialParking);
 
         parking.position.x = xPosition;
         parking.position.z = zPosition;
