@@ -15,7 +15,7 @@
       "uri": "http://apigobiernoabiertortod.valencia.es/rest/datasets/estado_parkings/75.json"
     },
     {
-      "plazaslib": "192",
+      "plazaslib": "150",
       "modified": "2021-04-20T06:08:04.96Z",
       "plazastot": "348",
       "nombre": "PLAÇA DE LA REINA",
@@ -36,7 +36,7 @@
       "uri": "http://apigobiernoabiertortod.valencia.es/rest/datasets/estado_parkings/8.json"
     },
     {
-      "plazaslib": "259",
+      "plazaslib": "360",
       "modified": "2021-04-20T01:17:37.272Z",
       "plazastot": "431",
       "nombre": "Centre Històric-Mercat Central",

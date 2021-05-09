@@ -2,7 +2,7 @@ import './styles.scss';
 import * as THREE from 'three';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
 
-(() => {
+(async() => {
     /* Tamaño de la escena */
     const sceneSize = {
         width: window.innerWidth,
@@ -12,62 +12,63 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
     /* Tamaño del plano de la ciudad */
     const planeSize = 22;
 
-    /* Numero de parkings */
-    const nParkings = 5;
+    /* Posición cámara principal */
+    const mainCameraPosition = Object.freeze({
+        x: 0,
+        y: 5,
+        z: 25,
+    });
 
-    /* Array de parkings */
-    let parkings = [];
+    /* Tipos de cámara */
+    const CameraType = Object.freeze({
+        MainCamera: 'MainCamera',
+        FirstPersonCamera: 'FirstPersonCamera',
+    });
+
+    /* Posición de la cámara */
+    let selectedCamera = CameraType.MainCamera;
 
     /* Tamaño del parking */
     const parkingSize = 1;
 
-    /* Objecto vehiculo */
+    /* Array de parkings */
+    let parkings = [];
+
+    /* Vehículo */
     let car;
 
-    /* Posicion camara arriba */
-    const mainCameraPosition = {
-        x: 0,
-        y: 5,
-        z: 25,
-    }
+    /* Dirección del vehículo */
+    let carDirection = 0;
 
-    /* Tipos de camara */
-    const CameraType = Object.freeze({
-        MainCamera: 'MainCamera',
-        SecondaryCamera: 'SecondaryCamera',
-    })
+    /* Velocidad del vehículo */
+    const carSpeed = 0.05;
 
-    /* Posicion de la camara */
-    let cameraPosition = CameraType.MainCamera;
+    /* Ángulo del coche */
+    let carAngle = 180;
 
-    /* */
+    /* Ángulo de la cámara en primera persona*/
+    let firstPersonCameraAngle = 0;
+
+    /* Controlador de teclas pulsadas */
     let keyPressedController = [];
 
     /* */
-    let direction = 0;
-    
-    /* */
-    let angle = 180;
-	let reverseAngle = 180;
-    let angleCamera = 0;
-    
-    /* */
-    const speed = 0.05;
+    let textsParkingsPlaces = [];
 
-    /* Creación de la camara y posicionamiento de la misma --> position.set(PosicionX PosicionY PosicionZ) */
+    /* Cámara y posicionamiento inicial de la misma */
     const camera = new THREE.PerspectiveCamera(45, sceneSize.width / sceneSize.height, 0.1, 1000);
     camera.position.set(mainCameraPosition.x, mainCameraPosition.y, mainCameraPosition.z);
 
-    /* Creación de la escena y asignación del color de fondo */
+    /* Escena y asignación del color de fondo */
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0xEAECEE); // Mismo color de fondo de todas las prácticas
 
-    /* */
-    const ambientLight = new THREE.AmbientLight( 0xcccccc, 0.4 );
+    /* Luz ambiental de la escena */
+    const ambientLight = new THREE.AmbientLight(0xcccccc, 0.4);
     scene.add(ambientLight);
 
-    /* */
-    const pointLight = new THREE.PointLight( 0xffffff, 0.8 );
+    /* Punto de luz */
+    const pointLight = new THREE.PointLight(0xffffff, 0.8);
     camera.add(pointLight);
     scene.add(camera);
 
@@ -80,77 +81,126 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
     renderer.setSize(sceneSize.width, sceneSize.height);
     document.body.appendChild(renderer.domElement);
 
-    /* Creación de las geometrias necesarias (box para los parkings y plane para la ciudad) */
+    /* Forma geométrica del parking */
     const boxGeometry = new THREE.BoxGeometry(parkingSize, parkingSize, parkingSize);
+
+    /* Forma geométrica del plano */
     const planeGeometry = new THREE.PlaneGeometry(planeSize, planeSize);
 
-    /* Creación del loader para poder cargar los assets correspondientes */
+    /* Cargador de texturas */
     const textureLoader = new THREE.TextureLoader();
 
-    /* Creación de las texturas */
-    const textureParking = textureLoader.load('./assets/parking.png');
-    const textureCity = textureLoader.load('./assets/city.jpg');
-    textureCity.wrapS = THREE.RepeatWrapping;
-    textureCity.wrapT = THREE.RepeatWrapping;
-    textureCity.magFilter = THREE.NearestFilter;
-    textureCity.repeat.set(2, 2);
+    /* Textura del parking */
+    const parkingTexture = textureLoader.load('./assets/parking.png');
 
-    /* Creación de los materiales en función de las texturas previamente creadas */
-    const materialParking = new THREE.MeshBasicMaterial({ color: 0xffffff, map: textureParking, });
-    const materialCity = new THREE.MeshBasicMaterial({ color: 0xffffff, map: textureCity, side: THREE.DoubleSide, });
+    /* Textura del plano */
+    const planeTexture = textureLoader.load('./assets/city.jpg');
+    planeTexture.wrapS = THREE.RepeatWrapping;
+    planeTexture.wrapT = THREE.RepeatWrapping;
+    planeTexture.magFilter = THREE.NearestFilter;
+    planeTexture.repeat.set(2, 2);
 
-    /* Random para generar la posicion de los parkings */
+    /* Material del parking */
+    const parkingMaterial = new THREE.MeshBasicMaterial({color: 0xffffff, map: parkingTexture,});
+
+    /* Material del plano */
+    const planeMaterial = new THREE.MeshBasicMaterial({color: 0xffffff, map: planeTexture, side: THREE.DoubleSide,});
+
+    /* Número aleatorio entre un rango definido */
     const random = (min, max) => Math.floor(Math.random() * (max - min)) + min;
 
-	/* */
-	const fontLoader = new THREE.FontLoader();
+    /* Datos de los parkings */
+    const response = await fetch('assets/parkings.json');
+    const parkingsData = await response.json();
 
-    /* Creación de los cubos de parking en función de las geometrias y meteriales */
-    for(let i = 0; i < nParkings; i++) {
+    /* */
+    const fontLoader = new THREE.FontLoader();
 
-		let xPosition = random(-(planeSize - parkingSize) / 2, (planeSize - parkingSize) / 2);
-        let zPosition = random(-(planeSize - parkingSize) / 2, (planeSize - parkingSize) / 2);
+    /* */
+    const materialTextParkingPlace = (freePlaces, totalPlaces) => {
+        const textRed = 0xF44336;
+        const textOrange = 0xFF9800;
+        const textYellow = 0xFFEB3B;
+        const textGreen = 0x4CAF50;
+        let color;
 
-		fontLoader.load('assets/helvetiker_regular.typeface.json', (font) => {
-			const color = 0x5850EC;
+        if(100 * freePlaces / totalPlaces >= 0 && 100 * freePlaces / totalPlaces < 25) {
+            color = textRed;
+        } else if(100 * freePlaces / totalPlaces >= 25 && 100 * freePlaces / totalPlaces < 50) {
+            color = textOrange;
+        } else if(100 * freePlaces / totalPlaces >= 50 && 100 * freePlaces / totalPlaces < 75) {
+            color = textYellow;
+        } else if(100 * freePlaces / totalPlaces >= 75 && 100 * freePlaces / totalPlaces <= 100) {
+            color = textGreen;
+        }
+        
+        return new THREE.MeshBasicMaterial({
+            color: color,
+            side: THREE.DoubleSide
+        });
+    };
 
-			const materialText = new THREE.MeshBasicMaterial({
-				color: color,
-				side: THREE.DoubleSide
-			});
+    /* */
+    const textParkingPlaces = (font, nFreePlaces, nTotalPlaces, randomXPosition, randomZPosition) => {
+        const freePlaces = nFreePlaces;
+        const shapesParkingPlaces = font.generateShapes(freePlaces, 0.25);
+        const geometryTextParkingPlaces = new THREE.ShapeGeometry(shapesParkingPlaces);
+        geometryTextParkingPlaces.computeBoundingBox();
+        const textParkingPlaces = new THREE.Mesh(geometryTextParkingPlaces, materialTextParkingPlace(nFreePlaces, nTotalPlaces));
 
-			const messageText = "Hola mundo";
+        textParkingPlaces.position.x = randomXPosition - nFreePlaces.length / (planeSize / 2);
+        textParkingPlaces.position.z = randomZPosition;
+        textParkingPlaces.position.y = parkingSize + 0.25;
 
-			const shapes = font.generateShapes(messageText, 0.5);
+        textsParkingsPlaces.push(textParkingPlaces);
+        scene.add(textParkingPlaces);
+    }
 
-			const geometryText = new THREE.ShapeGeometry(shapes);
+    /* */
+    for(let i = 0; i < parkingsData.resources.length; i++) {
 
-			geometryText.computeBoundingBox();
+        let randomXPosition = random(-(planeSize - parkingSize) / 2, (planeSize - parkingSize) / 2);
+        let randomZPosition = random(-(planeSize - parkingSize) / 2, (planeSize - parkingSize) / 2);
 
-			const text = new THREE.Mesh(geometryText, materialText);
-			text.position.x = xPosition - 1.5;
-			text.position.z = zPosition;
-			text.position.y = 1.25;
+        fontLoader.load('assets/helvetiker_regular.typeface.json', (font) => {
+            const textColor = 0x5850EC;
 
-			scene.add(text);
-		} ); 
+            const textMaterial = new THREE.MeshBasicMaterial({
+                color: textColor,
+                side: THREE.DoubleSide
+            });
 
-        const parking = new THREE.Mesh(boxGeometry, materialParking);
+            const parkingName = parkingsData.resources[i].nombre;
+            const textShape = font.generateShapes(parkingName, 0.25);
+            const textNameGeometry = new THREE.ShapeGeometry(textShape);
+            textNameGeometry.computeBoundingBox();
+            const textName = new THREE.Mesh(textNameGeometry, textMaterial);
 
-        parking.position.x = xPosition;
-        parking.position.z = zPosition;
+            textName.position.x = randomXPosition - parkingsData.resources[i].nombre.length / (planeSize / 2);
+            textName.position.z = randomZPosition;
+            textName.position.y = parkingSize + 0.55;
+
+            scene.add(textName);
+
+            textParkingPlaces(font, parkingsData.resources[i].plazaslib, parkingsData.resources[i].plazastot, randomXPosition, randomZPosition);
+        } ); 
+
+        const parking = new THREE.Mesh(boxGeometry, parkingMaterial);
+
+        parking.position.x = randomXPosition;
+        parking.position.z = randomZPosition;
         parking.position.y = 0.51; // Se eleva un poco cada cubo para evitar que atraviese el plano
 
         parkings.push(parking);
         scene.add(parking);
     }
-    
-    /* Creación del plano de la ciudad en función de las geometrias y meteriales */
-    const plane = new THREE.Mesh(planeGeometry, materialCity);
-    plane.rotation.x = Math.PI * -.5; // Rotamos el plano en el eje X para que quede completamente horizontal
+
+    /* Plano de la escena */
+    const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+    plane.rotation.x = Math.PI * -.5; // Rotación de 90º sobre el eje 'X' para colocar el plano horizontal
     scene.add(plane);
 
-    /* Creación del vehículo a traves del archivo OBJ */
+    /* Cargar del vehículo mediante el fichero OBJ y su textura mediante el fichero PNG correspondiente */
     const loadModel = () => {
         car.traverse((child) => {
             if(child.isMesh) {
@@ -159,11 +209,9 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
         });
         scene.add(car);
     }
-
     const manager = new THREE.LoadingManager(loadModel);
     const TextureLoaderCar = new THREE.TextureLoader(manager);
     const textureCar = TextureLoaderCar.load('./assets/Car.png');
-    
     const objLoader = new OBJLoader(manager);
     objLoader.load('./assets/Car.obj', (object) => {
         car = object;
@@ -172,7 +220,7 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
         car.rotation.y = Math.PI;
     });
 
-    /* Redimensión de los elementos en función del tamaño de ventana */
+    /* Registra el evento 'resize' producido cuando se cambia el tamaño de ventana */
     window.addEventListener('resize', () => {
         sceneSize.width = window.innerWidth;
         sceneSize.height = window.innerHeight;
@@ -184,74 +232,89 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
         renderer.setSize(sceneSize.width, sceneSize.height);
     });
 
-    /* */
+    /* Registra el evento 'keydown' producido cuando se presiona una tecla */
     document.addEventListener('keydown', (event) => {
         if(event.code === 'ArrowUp') {
-            direction = 1;
+            carDirection = 1;
             keyPressedController[event.code] = true;
         }
 
         if(event.code === 'ArrowDown') {
-            direction = -1;
+            carDirection = -1;
             keyPressedController[event.code] = true;
         }
 
         if(keyPressedController['ArrowUp'] === true && event.code === 'ArrowRight') {
-            angle -= 1;
-            angleCamera -= 1;
+            carAngle -= 1;
+            firstPersonCameraAngle -= 1;
         } else if(keyPressedController['ArrowDown'] === true && event.code === 'ArrowRight') {
-			angle += 1;
-            angleCamera -= 1;
-		}
+            carAngle += 1;
+            firstPersonCameraAngle += 1;
+        }
 
         if(keyPressedController['ArrowUp'] === true && event.code === 'ArrowLeft') {
-            angle += 1;
-            angleCamera += 1;
+            carAngle += 1;
+            firstPersonCameraAngle += 1;
         } else if(keyPressedController['ArrowDown'] === true && event.code === 'ArrowLeft') {
-			angle -= 1;
-            angleCamera += 1;
-		}
+            carAngle -= 1;
+            firstPersonCameraAngle -= 1;
+        }
 
-        if(event.code === 'Space' ) {
+        if(event.code === 'KeyC') {
             if(camera.position.z !== car.position.z) {
-                cameraPosition = CameraType.SecondaryCamera;
+                selectedCamera = CameraType.FirstPersonCamera;
             } else {
-                cameraPosition = CameraType.MainCamera;
+                selectedCamera = CameraType.MainCamera;
                 camera.position.set(mainCameraPosition.x, mainCameraPosition.y, mainCameraPosition.z);
                 camera.rotation.y = 0;
             }
         }
     });
 
-    /* */
+    /* Registra el evento 'keyup' producido cuando se levanta una tecla */
     document.addEventListener('keyup', (event) => {
         if(event.code === 'ArrowUp' || event.code === 'ArrowDown') {
             keyPressedController[event.code] = false;
         }
     })
 
-    /* */
+    /* Controlador del vehículo */
     const carController = () => {
+        /* Actualización de la posición del vehículo en los ejes 'X' y 'Z', y rotación del mismo en el eje 'Y' */
         if(keyPressedController['ArrowUp'] === true || keyPressedController['ArrowDown'] === true) {
-            car.position.z += (speed * direction) * Math.cos(Math.PI / 180 * angle);
-            car.position.x += (speed * direction) * Math.sin(Math.PI / 180 * angle);
-            car.rotation.y = Math.PI / 180 * angle;
+            car.position.z += (carSpeed * carDirection) * Math.cos(Math.PI / 180 * carAngle);
+            car.position.x += (carSpeed * carDirection) * Math.sin(Math.PI / 180 * carAngle);
+            car.rotation.y = Math.PI / 180 * carAngle;
         }
-    }
-    
-    /* */
-    const render = () => {
-        carController();
-        if(cameraPosition === CameraType.SecondaryCamera) {
+    };
+
+    /* Actualización de la posición de la cámara en función de la seleccionada*/
+    const cameraController = () => {
+        if(selectedCamera === CameraType.FirstPersonCamera) {
             camera.position.set(car.position.x, car.position.y + 0.4, car.position.z);
-            camera.rotation.y = Math.PI / 180 * angleCamera;
+            camera.rotation.y = Math.PI / 180 * firstPersonCameraAngle;
         }
-        parkings.forEach(parking => parking.rotation.y += 0.01);
-        renderer.render(scene, camera);
+    };
+
+    const parkingsController = () => {
+        parkings.forEach(parking => {
+            /* Rotación de todos los parkings sobre el eje 'Y' */
+            parking.rotation.y += 0.01;
+        })
     }
 
-    /* Renderización de la escena y la cámara en cada frame */
+    /* Renderización de la escena */
+    const render = () => {
+        carController();
+        cameraController();
+        parkingsController();
+
+        renderer.render(scene, camera);
+    };
+
+    /* Animación de la escena */
     const animate = () => {
+        /* Solicita que el navegador programe el repintado de la ventana para el próximo ciclo de animación */
         requestAnimationFrame(animate);
         render();
     };
