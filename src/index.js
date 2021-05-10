@@ -1,6 +1,8 @@
 import './styles.scss';
 import * as THREE from 'three';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
+import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader';
+import { DDSLoader } from 'three/examples/jsm/loaders/DDSLoader';
 
 (async() => {
     /* Tamaño de la escena */
@@ -46,6 +48,13 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
     /* Ángulo del coche */
     let carAngle = 180;
 
+    /* */
+    const carStartingPosition = Object.freeze({
+        x: -1,
+        y: 0,
+        z: 10.5,
+    });
+
     /* Ángulo de la cámara en primera persona*/
     let firstPersonCameraAngle = 0;
 
@@ -54,6 +63,9 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
 
     /* */
     let textsParkingsPlaces = [];
+
+    /* */
+    let parkingsNames = [];
 
     /* Cámara y posicionamiento inicial de la misma */
     const camera = new THREE.PerspectiveCamera(45, sceneSize.width / sceneSize.height, 0.1, 1000);
@@ -141,7 +153,7 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
     };
 
     /* */
-    const textParkingPlaces = (font, nFreePlaces, nTotalPlaces, randomXPosition, randomZPosition) => {
+    const textParkingPlaces = (font, nFreePlaces, nTotalPlaces, randomXPosition, randomZPosition, index, nRemove) => {
         const freePlaces = nFreePlaces;
         const shapesParkingPlaces = font.generateShapes(freePlaces, 0.25);
         const geometryTextParkingPlaces = new THREE.ShapeGeometry(shapesParkingPlaces);
@@ -152,7 +164,7 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
         textParkingPlaces.position.z = randomZPosition;
         textParkingPlaces.position.y = parkingSize + 0.25;
 
-        textsParkingsPlaces.push(textParkingPlaces);
+        textsParkingsPlaces.splice(index, nRemove, textParkingPlaces);
         scene.add(textParkingPlaces);
     }
 
@@ -180,9 +192,10 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
             textName.position.z = randomZPosition;
             textName.position.y = parkingSize + 0.55;
 
+            parkingsNames.push(textName);
             scene.add(textName);
 
-            textParkingPlaces(font, parkingsData.resources[i].plazaslib, parkingsData.resources[i].plazastot, randomXPosition, randomZPosition);
+            textParkingPlaces(font, parkingsData.resources[i].plazaslib, parkingsData.resources[i].plazastot, randomXPosition, randomZPosition, i, 0);
         } ); 
 
         const parking = new THREE.Mesh(boxGeometry, parkingMaterial);
@@ -200,25 +213,17 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
     plane.rotation.x = Math.PI * -.5; // Rotación de 90º sobre el eje 'X' para colocar el plano horizontal
     scene.add(plane);
 
-    /* Cargar del vehículo mediante el fichero OBJ y su textura mediante el fichero PNG correspondiente */
-    const loadModel = () => {
-        car.traverse((child) => {
-            if(child.isMesh) {
-                child.material.map = textureCar;
-            }
+    /* Cargar del vehículo mediante el fichero OBJ y su textura mediante el fichero MTL correspondiente */
+    new MTLLoader().load('./assets/Car.mtl', (materials) => {
+        materials.preload();
+        new OBJLoader().setMaterials(materials).load('./assets/Car.obj', (object) => {
+            car = object;
+            car.scale.set(0.01, 0.01, 0.01);
+            car.position.set(carStartingPosition.x, carStartingPosition.y, carStartingPosition.z);
+            car.rotation.y = Math.PI;
+            scene.add(car);
         });
-        scene.add(car);
-    }
-    const manager = new THREE.LoadingManager(loadModel);
-    const TextureLoaderCar = new THREE.TextureLoader(manager);
-    const textureCar = TextureLoaderCar.load('./assets/Car.png');
-    const objLoader = new OBJLoader(manager);
-    objLoader.load('./assets/Car.obj', (object) => {
-        car = object;
-        car.scale.set(0.01, 0.01, 0.01);
-        car.position.set(-1, 0, 10.5);
-        car.rotation.y = Math.PI;
-    });
+    } );
 
     /* Registra el evento 'resize' producido cuando se cambia el tamaño de ventana */
     window.addEventListener('resize', () => {
@@ -288,6 +293,37 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
         }
     };
 
+    /* */
+    const collisionControler = () => {
+        if(car) {
+            parkings.forEach((parking, index) => {
+                if(parking.position.x - parkingSize / 2 <= car.position.x && parking.position.x + parkingSize / 2 >= car.position.x && parking.position.z - parkingSize / 2 <= car.position.z && parking.position.z + parkingSize / 2 >= car.position.z) {
+                    /* */
+                    scene.remove(textsParkingsPlaces[index]);
+                    // /* */
+                    car.position.set(carStartingPosition.x, carStartingPosition.y, carStartingPosition.z);
+                    carAngle = 180;
+                    carDirection = 0;
+                    firstPersonCameraAngle = 0;
+
+                    parkingsData.resources[index].plazaslib--;
+
+                    if(parkingsData.resources[index].plazaslib == 0) {
+                        scene.remove(parking);
+                        scene.remove(parkingsNames[index]);
+                        parkings.splice(index, 1);
+                        return;
+                    }
+                    
+                    /* */
+                    fontLoader.load('assets/helvetiker_regular.typeface.json', (font) => {
+                        textParkingPlaces(font, parkingsData.resources[index].plazaslib + "", parkingsData.resources[index].plazastot, parking.position.x, parking.position.z, index, 1);
+                    });
+                }
+            })
+        }
+    };
+
     /* Actualización de la posición de la cámara en función de la seleccionada*/
     const cameraController = () => {
         if(selectedCamera === CameraType.FirstPersonCamera) {
@@ -297,8 +333,8 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
     };
 
     const parkingsController = () => {
+        /* Rotación de todos los parkings sobre el eje 'Y' */
         parkings.forEach(parking => {
-            /* Rotación de todos los parkings sobre el eje 'Y' */
             parking.rotation.y += 0.01;
         })
     }
@@ -306,6 +342,7 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
     /* Renderización de la escena */
     const render = () => {
         carController();
+        collisionControler();
         cameraController();
         parkingsController();
 
